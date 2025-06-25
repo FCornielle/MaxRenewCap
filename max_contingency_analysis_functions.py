@@ -135,7 +135,7 @@ def process_cargabilidad(df):
     return line_load_df
 
 
-def optimize_generators_for_substations(substations, network_data, hoja, initial_potencia=1, factor_potencia=0.95, max_cargabilidad=110, threshold_inconvergence=10):
+def optimize_generators_for_substations(app, substations, network_data, hoja, initial_potencia=1, factor_potencia=0.95, max_cargabilidad=110, threshold_inconvergence=10):
     """
     Itera sobre cada subestación, agregando un generador, corriendo el análisis de contingencia y verificando el 
     máximo de potencia que puede soportar sin exceder el 110% de cargabilidad en ninguna línea.
