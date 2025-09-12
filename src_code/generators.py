@@ -87,6 +87,14 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     
     # Create static generator
     static_generator = hoja.CreateObject('ElmGenstat', 'Generador_Estatico')
+    if static_generator is None:
+        print(f"Error: No se pudo crear el generador estático en la hoja '{hoja_name}'.")
+        print("Posibles causas:")
+        print("1. El nombre 'Generador_Estatico' ya existe")
+        print("2. No hay permisos para crear objetos en esta ubicación")
+        print("3. El tipo de objeto no es válido en este contexto")
+        return None, None, None, None, None
+    
     static_generator.SetAttribute('sgn', potencia_aparente)
     static_generator.SetAttribute('e:pgini', potencia_activa)
     static_generator.SetAttribute('cosn', factor_potencia)
