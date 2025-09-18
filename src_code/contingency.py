@@ -6,7 +6,7 @@ processing results, and optimizing generators for substations.
 """
 
 import pandas as pd
-from .generators import create_static_generator, update_generator_power, delete_generator, calculate_power_limits
+from .generators import create_static_generator, update_generator_power, delete_generator, calculate_power_limits, cleanup_existing_generator
 
 
 def run_contingency_analysis(app):

@@ -29,7 +29,10 @@ from .contingency import (
 
 from .generators import (
     create_static_generator,
-    calculate_power_limits
+    calculate_power_limits,
+    delete_generator,
+    update_generator_power,
+    cleanup_existing_generator
 )
 
 from .io_utils import (
@@ -67,6 +70,9 @@ __all__ = [
     # Generator management
     'create_static_generator',
     'calculate_power_limits',
+    'delete_generator',
+    'update_generator_power',
+    'cleanup_existing_generator',
     
     # I/O utilities
     'load_contingency_results',

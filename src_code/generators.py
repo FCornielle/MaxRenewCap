@@ -72,27 +72,43 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     
     print(f"Barra '{barra_name}' encontrada. Creando cubículo y generador estático.")
     
+    # Clean up any existing generator for this bus
+    cleanup_existing_generator(app, barra_name)
+    
+    # Create unique names based on bus name
+    cubicle_name = f'Cubicle_Gen_{barra_name}'
+    switcher_name = f'Switch_Gen_{barra_name}'
+    generator_name = f'Gen_Estatico_{barra_name}'
+    
     # Create cubicle
-    cubicle = bus.CreateObject('StaCubic', 'Cubicle_Generador')
-    cubicle.bus1 = bus
-    if cubicle:
-        print(f"Cubículo creado en la barra '{barra_name}' y conectado a la barra.")
-    else:
-        print(f"Error al crear el cubículo en la barra '{barra_name}'.")
+    cubicle = bus.CreateObject('StaCubic', cubicle_name)
+    if not cubicle:
+        print(f"Error al crear el cubículo '{cubicle_name}' en la barra '{barra_name}'.")
         return None, None, None, None, None
     
+    cubicle.bus1 = bus
+    print(f"Cubículo '{cubicle_name}' creado en la barra '{barra_name}' y conectado a la barra.")
+    
     # Create switcher
-    switcher = cubicle.CreateObject('StaSwitch', 'Switcher_Generador')
+    switcher = cubicle.CreateObject('StaSwitch', switcher_name)
+    if not switcher:
+        print(f"Error al crear el switcher '{switcher_name}' en el cubículo.")
+        cubicle.Delete()
+        return None, None, None, None, None
+    
     switcher.on_off = 1
     
-    # Create static generator
-    static_generator = hoja.CreateObject('ElmGenstat', 'Generador_Estatico')
+    # Create static generator with unique name
+    static_generator = hoja.CreateObject('ElmGenstat', generator_name)
     if static_generator is None:
-        print(f"Error: No se pudo crear el generador estático en la hoja '{hoja_name}'.")
+        print(f"Error: No se pudo crear el generador estático '{generator_name}' en la hoja '{hoja_name}'.")
         print("Posibles causas:")
-        print("1. El nombre 'Generador_Estatico' ya existe")
+        print("1. El nombre ya existe")
         print("2. No hay permisos para crear objetos en esta ubicación")
         print("3. El tipo de objeto no es válido en este contexto")
+        # Clean up created objects
+        switcher.Delete()
+        cubicle.Delete()
         return None, None, None, None, None
     
     static_generator.SetAttribute('sgn', potencia_aparente)
@@ -155,3 +171,43 @@ def delete_generator(static_generator, cubicle):
         static_generator.Delete()
     if cubicle:
         cubicle.Delete()
+
+
+def cleanup_existing_generator(app, bus_name):
+    """
+    Clean up any existing generator and cubicle for a specific bus.
+    
+    Args:
+        app: PowerFactory application object
+        bus_name (str): Name of the bus to clean up
+        
+    Example:
+        >>> cleanup_existing_generator(app, 'Bus1')
+    """
+    # Find the bus
+    bus = None
+    for b in app.GetCalcRelevantObjects('*.ElmTerm'):
+        if b.loc_name == bus_name:
+            bus = b
+            break
+    
+    if not bus:
+        return
+    
+    # Look for existing cubicles with generator pattern
+    cubicle_name = f'Cubicle_Gen_{bus_name}'
+    existing_cubicles = bus.GetContents(cubicle_name, 1)
+    
+    for cubicle in existing_cubicles:
+        if cubicle_name in cubicle.loc_name:
+            print(f"Eliminando cubículo existente '{cubicle.loc_name}' en la barra '{bus_name}'.")
+            cubicle.Delete()
+    
+    # Also check for any static generators with the pattern
+    generator_name = f'Gen_Estatico_{bus_name}'
+    existing_generators = app.GetCalcRelevantObjects(f'*.ElmGenstat')
+    
+    for gen in existing_generators:
+        if generator_name in gen.loc_name:
+            print(f"Eliminando generador existente '{gen.loc_name}'.")
+            gen.Delete()
