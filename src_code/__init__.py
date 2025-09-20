@@ -32,7 +32,8 @@ from .generators import (
     calculate_power_limits,
     delete_generator,
     update_generator_power,
-    cleanup_existing_generator
+    cleanup_existing_generator,
+    cleanup_all_test_generators
 )
 
 from .io_utils import (
@@ -73,6 +74,7 @@ __all__ = [
     'delete_generator',
     'update_generator_power',
     'cleanup_existing_generator',
+    'cleanup_all_test_generators',
     
     # I/O utilities
     'load_contingency_results',

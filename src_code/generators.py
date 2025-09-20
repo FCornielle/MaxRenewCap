@@ -52,12 +52,57 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     
     # Calculate power limits
     potencia_aparente, potencia_reactiva_max, potencia_reactiva_min = calculate_power_limits(potencia_activa, factor_potencia)
+    print(f"Límites calculados: S = {potencia_aparente:.2f} MVA, Q_max = {potencia_reactiva_max:.2f} MVar, Q_min = {potencia_reactiva_min:.2f} MVar")
     
     print(f"Buscando hoja '{hoja_name}' en 'Network Data'.")
-    hoja = network_data.GetContents(hoja_name, 1)[0]
+    
+    # Look for the Grid data folder (not the network diagram)
+    hoja = None
+    data_folders = network_data.GetContents('*', 1)
+    
+    for folder in data_folders:
+        print(f"Debug: Found folder: {folder.loc_name} (type: {folder.GetClassName()})")
+        if folder.loc_name == hoja_name:
+            # Check if it's a data folder (not a network diagram)
+            if folder.GetClassName() in ['IntFolder', 'IntPrjfolder', 'ElmNet']:
+                print(f"Debug: Found Grid data folder: '{folder.loc_name}' (type: {folder.GetClassName()})")
+                # Test if we can create generators in this specific folder
+                try:
+                    test_gen = folder.CreateObject('ElmGenstat', 'Test_Gen_Temp')
+                    if test_gen:
+                        print(f"Debug: ✅ Can create generators in Grid folder: '{folder.loc_name}'")
+                        test_gen.Delete()
+                        hoja = folder
+                        break
+                    else:
+                        print(f"Debug: ❌ Cannot create generators in Grid folder '{folder.loc_name}'")
+                except Exception as e:
+                    print(f"Debug: ❌ Error testing Grid folder '{folder.loc_name}': {e}")
+            elif folder.GetClassName() == 'IntGrfnet':
+                print(f"Debug: Found Grid network diagram: '{folder.loc_name}' (type: {folder.GetClassName()})")
+                print("Debug: This is a network diagram, not a data folder. Looking for Grid data folder...")
+                # Look for the actual Grid data folder that contains generators
+                for data_folder in data_folders:
+                    if data_folder.loc_name == hoja_name and data_folder.GetClassName() in ['IntFolder', 'IntPrjfolder', 'ElmNet']:
+                        print(f"Debug: Found Grid data folder: '{data_folder.loc_name}' (type: {data_folder.GetClassName()})")
+                        # Test if we can create generators in this folder
+                        try:
+                            test_gen = data_folder.CreateObject('ElmGenstat', 'Test_Gen_Temp')
+                            if test_gen:
+                                print(f"Debug: ✅ Can create generators in Grid folder: '{data_folder.loc_name}'")
+                                test_gen.Delete()
+                                hoja = data_folder
+                                break
+                            else:
+                                print(f"Debug: ❌ Cannot create generators in Grid folder '{data_folder.loc_name}'")
+                        except Exception as e:
+                            print(f"Debug: ❌ Error testing Grid folder '{data_folder.loc_name}': {e}")
+                break
+    
+    # If no suitable Grid folder found, use Network Data directly
     if not hoja:
-        print(f"No se encontró la hoja '{hoja_name}' en 'Network Data'.")
-        return None, None, None, None, None
+        print("Debug: No suitable Grid data folder found. Using Network Data directly...")
+        hoja = network_data
     
     # Find the bus
     bus = None
@@ -98,27 +143,64 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     
     switcher.on_off = 1
     
-    # Create static generator with unique name
+    # Debug: Check what objects can be created in cubicle
+    print(f"Debug: Cubicle type: {cubicle.GetClassName()}")
+    print(f"Debug: Cubicle name: {cubicle.loc_name}")
+    
+    # Debug: Check what objects can be created in the Grid folder
+    print(f"Debug: Grid folder type: {hoja.GetClassName()}")
+    print(f"Debug: Grid folder name: {hoja.loc_name}")
+    
+    # Debug: Check existing generators in the project
+    print("Debug: Checking existing generators in project...")
+    existing_gens = app.GetCalcRelevantObjects('*.ElmGenstat')
+    print(f"Debug: Found {len(existing_gens)} existing static generators")
+    for gen in existing_gens[:5]:  # Show first 5
+        print(f"Debug: - {gen.loc_name} (type: {gen.GetClassName()})")
+    
+    # Debug: Final check of the hoja we'll use
+    print(f"Debug: Final hoja type: {hoja.GetClassName()}")
+    print(f"Debug: Final hoja name: {hoja.loc_name}")
+    
+    # Try to create static generator in the Grid folder first
+    print(f"Intentando crear generador en la hoja '{hoja_name}'...")
     static_generator = hoja.CreateObject('ElmGenstat', generator_name)
     if static_generator is None:
         print(f"Error: No se pudo crear el generador estático '{generator_name}' en la hoja '{hoja_name}'.")
-        print("Posibles causas:")
-        print("1. El nombre ya existe")
-        print("2. No hay permisos para crear objetos en esta ubicación")
-        print("3. El tipo de objeto no es válido en este contexto")
-        # Clean up created objects
-        switcher.Delete()
-        cubicle.Delete()
-        return None, None, None, None, None
+        print("Intentando crear en el cubículo como alternativa...")
+        
+        # Try creating in the cubicle as fallback
+        static_generator = cubicle.CreateObject('ElmGenstat', generator_name)
+        if static_generator is None:
+            print(f"Error: No se pudo crear el generador estático '{generator_name}' en el cubículo tampoco.")
+            print("Posibles causas:")
+            print("1. El nombre ya existe")
+            print("2. No hay permisos para crear objetos en esta ubicación")
+            print("3. El tipo de objeto no es válido en este contexto")
+            # Clean up created objects
+            switcher.Delete()
+            cubicle.Delete()
+            return None, None, None, None, None
+        else:
+            print(f"✅ Generador creado exitosamente en el cubículo.")
+    else:
+        print(f"✅ Generador creado exitosamente en la hoja '{hoja_name}'.")
     
     static_generator.SetAttribute('sgn', potencia_aparente)
     static_generator.SetAttribute('e:pgini', potencia_activa)
     static_generator.SetAttribute('cosn', factor_potencia)
-    static_generator.SetAttribute('av_mode', 'constv')
+    static_generator.SetAttribute('av_mode', 'constv')  # Constant voltage mode for reactive power management
     static_generator.term = cubicle
     static_generator.SetAttribute('usetp', 1)
-    static_generator.SetAttribute('cQ_max', potencia_reactiva_max)
-    static_generator.SetAttribute('cQ_min', potencia_reactiva_min)
+    
+    # Set reactive power limits using correct PowerFactory attributes
+    static_generator.SetAttribute('q_max', potencia_reactiva_max)
+    static_generator.SetAttribute('q_min', potencia_reactiva_min)
+    
+    # Set voltage reference for constv mode (should be close to bus voltage)
+    static_generator.SetAttribute('usetp', 1)  # Enable the generator
+    static_generator.SetAttribute('av_mode', 'constv')  # Ensure constv mode
+    static_generator.SetAttribute('e:usetp', 1)  # Enable in calculation
     cubicle.obj_id = static_generator
     
     # Run power flow
@@ -128,8 +210,8 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     
     # Get results
     bus_voltage = bus.GetAttribute('m:u')
-    potencia_activa_generada = static_generator.GetAttribute('m:P:bus1')
-    potencia_reactiva_generada = static_generator.GetAttribute('m:Q:bus1')
+    potencia_activa_generada = static_generator.GetAttribute('c:p')
+    potencia_reactiva_generada = static_generator.GetAttribute('c:q')
     
     print(f"Generador estático creado: Voltaje barra = {bus_voltage}, P generada = {potencia_activa_generada}, Q generada = {potencia_reactiva_generada}")
     
@@ -152,8 +234,16 @@ def update_generator_power(static_generator, potencia_activa, factor_potencia):
     
     static_generator.SetAttribute('sgn', potencia_aparente)
     static_generator.SetAttribute('e:pgini', potencia_activa)
-    static_generator.SetAttribute('cQ_max', potencia_reactiva_max)
-    static_generator.SetAttribute('cQ_min', potencia_reactiva_min)
+    static_generator.SetAttribute('cosn', factor_potencia)
+    
+    # Set reactive power limits using correct PowerFactory attributes
+    static_generator.SetAttribute('q_max', potencia_reactiva_max)
+    static_generator.SetAttribute('q_min', potencia_reactiva_min)
+    
+    # Ensure constv mode is maintained for reactive power control
+    static_generator.SetAttribute('av_mode', 'constv')
+    static_generator.SetAttribute('usetp', 1)
+    static_generator.SetAttribute('e:usetp', 1)
 
 
 def delete_generator(static_generator, cubicle):
@@ -184,6 +274,8 @@ def cleanup_existing_generator(app, bus_name):
     Example:
         >>> cleanup_existing_generator(app, 'Bus1')
     """
+    print(f"Limpiando generadores existentes para la barra '{bus_name}'...")
+    
     # Find the bus
     bus = None
     for b in app.GetCalcRelevantObjects('*.ElmTerm'):
@@ -192,22 +284,92 @@ def cleanup_existing_generator(app, bus_name):
             break
     
     if not bus:
+        print(f"Barra '{bus_name}' no encontrada.")
         return
     
     # Look for existing cubicles with generator pattern
     cubicle_name = f'Cubicle_Gen_{bus_name}'
-    existing_cubicles = bus.GetContents(cubicle_name, 1)
+    generator_name = f'Gen_Estatico_{bus_name}'
     
-    for cubicle in existing_cubicles:
+    # Get all cubicles and generators from the entire project
+    all_cubicles = app.GetCalcRelevantObjects('*.StaCubic')
+    all_generators = app.GetCalcRelevantObjects('*.ElmGenstat')
+    
+    # Also search in the project folders
+    try:
+        project_folders = app.GetProjectFolder('net').GetContents('*', 1)
+        for folder in project_folders:
+            if folder.GetClassName() in ['IntFolder', 'IntPrjfolder']:
+                folder_cubicles = folder.GetContents('*.StaCubic', 1)
+                folder_generators = folder.GetContents('*.ElmGenstat', 1)
+                all_cubicles.extend(folder_cubicles)
+                all_generators.extend(folder_generators)
+    except Exception as e:
+        print(f"Debug: Error searching project folders: {e}")
+    
+    # Find and delete matching cubicles
+    cubicles_deleted = 0
+    for cubicle in all_cubicles:
         if cubicle_name in cubicle.loc_name:
             print(f"Eliminando cubículo existente '{cubicle.loc_name}' en la barra '{bus_name}'.")
-            cubicle.Delete()
+            try:
+                cubicle.Delete()
+                cubicles_deleted += 1
+            except Exception as e:
+                print(f"Error al eliminar cubículo '{cubicle.loc_name}': {e}")
     
-    # Also check for any static generators with the pattern
-    generator_name = f'Gen_Estatico_{bus_name}'
-    existing_generators = app.GetCalcRelevantObjects(f'*.ElmGenstat')
-    
-    for gen in existing_generators:
+    # Find and delete matching generators
+    generators_deleted = 0
+    for gen in all_generators:
         if generator_name in gen.loc_name:
             print(f"Eliminando generador existente '{gen.loc_name}'.")
-            gen.Delete()
+            try:
+                gen.Delete()
+                generators_deleted += 1
+            except Exception as e:
+                print(f"Error al eliminar generador '{gen.loc_name}': {e}")
+    
+    print(f"Limpieza completada: {cubicles_deleted} cubículos y {generators_deleted} generadores eliminados.")
+
+
+def cleanup_all_test_generators(app):
+    """
+    Clean up all test generators and cubicles created by this script.
+    
+    Args:
+        app: PowerFactory application object
+        
+    Example:
+        >>> cleanup_all_test_generators(app)
+    """
+    print("Limpiando todos los generadores de prueba existentes...")
+    
+    # Get all static generators
+    all_generators = app.GetCalcRelevantObjects('*.ElmGenstat')
+    generators_to_delete = []
+    
+    for gen in all_generators:
+        if 'Gen_Estatico_Bus' in gen.loc_name:
+            generators_to_delete.append(gen)
+            print(f"Encontrado generador de prueba: '{gen.loc_name}'")
+    
+    # Delete generators
+    for gen in generators_to_delete:
+        print(f"Eliminando generador: '{gen.loc_name}'")
+        gen.Delete()
+    
+    # Get all cubicles
+    all_cubicles = app.GetCalcRelevantObjects('*.StaCubic')
+    cubicles_to_delete = []
+    
+    for cubicle in all_cubicles:
+        if 'Cubicle_Gen_Bus' in cubicle.loc_name:
+            cubicles_to_delete.append(cubicle)
+            print(f"Encontrado cubículo de prueba: '{cubicle.loc_name}'")
+    
+    # Delete cubicles
+    for cubicle in cubicles_to_delete:
+        print(f"Eliminando cubículo: '{cubicle.loc_name}'")
+        cubicle.Delete()
+    
+    print(f"Limpieza completada. Eliminados {len(generators_to_delete)} generadores y {len(cubicles_to_delete)} cubículos.")
