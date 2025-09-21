@@ -1,252 +1,225 @@
-# PowerFactory Contingency Analysis Optimizer
+# PowerFactory Generator Optimization Tool
 
-## Project Overview
+A comprehensive Python tool for optimizing static generators in PowerFactory by running N-1 contingency analysis and finding the maximum safe power that can be injected at each substation without exceeding loading limits.
 
-This project implements an automated contingency analysis optimizer for power systems using DIgSILENT PowerFactory. The system creates static generators at various substations and determines the maximum safe power injection before any transmission line exceeds 110% loading capacity under N-1 contingency conditions.
+## Features
 
-## Key Features
-
-- **Static Generator Management**: Creates and manages static generators with constant voltage (`constv`) control mode
-- **N-1 Contingency Analysis**: Automatically runs contingency analysis for all line outages
-- **Line Loading Optimization**: Finds maximum safe power before exceeding 110% line loading
-- **Inconvergence Detection**: Handles cases where power increases cause system instability
-- **Comprehensive Results**: Tracks maximum power, critical lines, and iterations for each substation
-
-## Project Setup Considerations
-
-### ⚠️ **IMPORTANT: System Modifications Required**
-
-Before running this project, the following modifications must be made to the PowerFactory project:
-
-#### 1. **Line Capacity Duplication**
-- **Lines exceeding 100% loading must be duplicated** to create parallel circuits
-- Each overloaded line should have a second identical line in parallel
-- This effectively doubles the capacity of overloaded transmission corridors
-- **Reason**: The original 39 Bus New England System has several lines that are already overloaded under normal load flow conditions (e.g., Line 23-24 at 158%, Line 21-22 at 157%, etc.). Duplicating these lines reduces their loading to manageable levels (typically 50-80%) and allows for proper testing of the contingency analysis.
-
-**Example of Required Duplication:**
-- Lines over 100% loading: Line 23-24, Line 21-22, Line 05-06, Line 06-07, Line 05-08, Line 16-21, Line 10-11, Line 22-23, Line 10-13, Line 06-11, Line 13-14, Line 16-24
-- After duplication, these lines show as two parallel circuits (Par.no. 1 and Par.no. 2) with reduced loading percentages
-
-#### 2. **Generator and Transformer Duplication**
-- **The following components must be duplicated** to create parallel units:
-  - **Static Generator 'G 02'** (Type Gen 02) - Currently operating at ~76-77 MW, 151-152 MVar
-  - **Transformer 'Trf 06 - 31'** (Type 06 - 31 YNy0) - Currently operating at high loading levels
-- Each original generator and transformer should have a second identical unit in parallel
-- **Reason**: These components are operating close to their limits under normal conditions (as shown in the power flow results). Duplicating them provides additional capacity headroom for testing the contingency analysis and power injection without immediate overloads before adding static generators for maximum power injection testing.
-
-#### 3. **Current System Status**
-The system has been properly configured with duplicated lines. Current loading percentages show:
-- **Duplicated lines (Par.no. 2)**: Loading reduced to 50-80% range
-- **Original lines (Par.no. 1)**: Maintained for reference
-- **Lines 09-39A and 09-39B**: Show empty loading (likely disconnected or special configuration)
-
-#### 4. **Contingency Analysis Configuration**
-- **Create fault cases for ALL lines** in the system (both original and duplicated)
-- Each line should have a corresponding contingency case
-- Configure contingency analysis with the following settings:
-  - **Calculation Method**: AC Load Flow Calculation
-  - **Load Flow**: Use the standard Load Flow Calculation
-  - **Static Contingencies**: Include all line outages (typically 34+ contingencies)
-  - **Dynamic Contingencies**: Not required for this analysis
-
-#### 5. **Variable Selection Setup**
-- **Only include "Line" objects** in the variable selection
-- Remove all other object types (transformers, generators, loads, etc.)
-- This ensures the analysis focuses only on transmission line loading
-- The variable selection should contain only line loading variables
-
-#### 6. **Static Generator Placement**
-- **Static generators will be connected to duplicated lines** (Par.no. 2) when available
-- This ensures the analysis tests the system under realistic loading conditions
-- The duplicated lines provide the necessary capacity headroom for power injection testing
-
-#### 7. **Contingency Analysis Parameters**
-Configure the contingency analysis with these specific settings:
-```
-- iopt_Linear = 0 (AC Load Flow)
-- loadmax = 50 (Maximum loading percentage to analyze)
-- vlmin = 0.9 (Minimum voltage limit)
-- vlmax = 1.1 (Maximum voltage limit)
-- vmax_step = 5 (Voltage step for analysis)
-```
+- **Modular Design**: Clean, organized code structure with separate modules for different functionalities
+- **N-1 Contingency Analysis**: Automated contingency analysis with configurable parameters
+- **Generator Optimization**: Find maximum safe power injection at each substation
+- **Convergence Detection**: Smart detection and handling of convergence issues
+- **Results Visualization**: Comprehensive dashboards and plots
+- **Export Capabilities**: Save results in multiple formats (CSV, text reports)
+- **Error Handling**: Robust error handling and cleanup procedures
 
 ## Project Structure
 
 ```
-├── src_code/
-│   ├── __init__.py
-│   ├── pf_env.py              # PowerFactory environment setup
-│   ├── generators.py          # Static generator management
-│   ├── contingency.py         # Contingency analysis functions
-│   ├── plotting.py            # Visualization functions
-│   └── io_utils.py            # Input/output utilities
-├── notebooks/
-│   ├── max_contingency_job.ipynb      # Main analysis notebook
-│   └── max_contingency_analysis.ipynb # Reference implementation
-├── reference_code/
-│   └── code.ipynb             # PowerFactory reference examples
-├── pf_project/
-│   └── 39 Bus New England System.pfd  # PowerFactory project file
-├── Resultados.csv             # Contingency analysis results
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+PowerFactory-Generator-Optimization/
+├── main.py                 # Main execution script
+├── requirements.txt        # Python dependencies
+├── README.md              # This file
+├── src_code/              # Source code package
+│   ├── __init__.py        # Package initialization
+│   ├── pf_env.py          # PowerFactory environment setup
+│   ├── generators.py      # Generator management functions
+│   ├── contingency.py     # Contingency analysis functions
+│   ├── io_utils.py        # Input/output utilities
+│   └── plotting.py        # Visualization functions
+├── output/                # Results output directory (created automatically)
+├── plots/                 # Generated plots directory (created automatically)
+└── notebooks/             # Jupyter notebooks (legacy code)
+    ├── max_contingency_analysis.ipynb
+    └── max_contingency_job.ipynb
 ```
+
+## Prerequisites
+
+1. **PowerFactory Software**: DIgSILENT PowerFactory 2021 SP2 or compatible version
+2. **Python Environment**: Python 3.9 (as required by PowerFactory)
+3. **PowerFactory License**: Valid PowerFactory license for running calculations
 
 ## Installation
 
-1. **Install Python Dependencies**:
+1. **Clone or download** this repository to your local machine
+
+2. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **PowerFactory Setup**:
-   - Install DIgSILENT PowerFactory 2021 SP2 or later
-   - Ensure Python 3.9 is available in PowerFactory's Python environment
-   - Update the PowerFactory path in the notebook if needed
-
-3. **Project Modifications** (See Setup Considerations above):
-   - Duplicate all transmission lines
-   - Configure contingency analysis
-   - Set up variable selection
+3. **Verify PowerFactory installation**:
+   - Ensure PowerFactory is installed and licensed
+   - Note the PowerFactory Python installation path (usually `C:\Program Files\DIgSILENT\PowerFactory 2021 SP2\Python\3.9`)
 
 ## Usage
 
-### Running the Analysis
+### Quick Start
 
-1. **Open the main notebook**:
+1. **Open PowerFactory** and load your project
+2. **Run the main script**:
    ```bash
-   jupyter notebook notebooks/max_contingency_job.ipynb
+   python main.py
    ```
 
-2. **Execute cells in order**:
-   - Cell 1-8: Initialize PowerFactory and activate project
-   - Cell 9-14: Set up study case and operation scenario
-   - Cell 15-17: Configure network data
-   - Cell 23: **Run the complete contingency analysis optimizer**
+### Configuration
 
-### Configuration Parameters
-
-The analysis can be customized by modifying these parameters in the main cell:
+Edit the configuration section in `main.py` to customize:
 
 ```python
-# Substations to analyze
-substations = [
-    "Bus 03", "Bus 04", "Bus 05", "Bus 06", 
-    "Bus 07", "Bus 08", "Bus 09"
-]
+# PowerFactory configuration
+DIG_PATH = r'C:\Program Files\DIgSILENT\PowerFactory 2021 SP2\Python\3.9'
+PROJECT_NAME = "39 Bus New England System"
+STUDY_CASE_NAME = "1. Power Flow"
+OPERATION_SCENARIO_NAME = "Ene_Bloque_3_dem_min_diurna_2028"
+HOJA_NAME = "NORTE"
 
-# Analysis parameters
-initial_potencia = 1          # Starting power (MW)
-factor_potencia = 0.95        # Power factor
-max_cargabilidad = 110        # Maximum line loading (%)
-threshold_inconvergence = 10  # Inconvergence threshold (%)
+# Optimization parameters
+INITIAL_POTENCIA = 1  # MW
+FACTOR_POTENCIA = 0.95
+MAX_CARGABILIDAD = 110  # %
+THRESHOLD_INCONVERGENCE = 10  # %
+
+# Substations to analyze
+SUBSTATIONS = [
+    "bonao3",
+    "canabacoa", 
+    "guayubin"
+    # Add more substations as needed
+]
 ```
 
-## How It Works
+### Advanced Usage
 
-### 1. **Generator Creation**
-- Creates static generators with `constv` (constant voltage) control mode
-- Generators are placed in the correct Grid data folder
-- Each generator starts at 1 MW with 0.95 power factor
+#### Using Individual Modules
 
-### 2. **Contingency Analysis Loop**
-For each substation:
-- Creates a static generator
-- Incrementally increases power by 1 MW
-- Runs N-1 contingency analysis after each increase
-- Checks all line loading percentages
-- Stops when any line exceeds 110% loading
+```python
+from src_code import (
+    initialize_powerfactory,
+    create_static_generator,
+    run_contingency_analysis,
+    optimize_generators_for_substations
+)
 
-### 3. **Results Processing**
-- Identifies the critical line that limits power injection
-- Records maximum safe power for each substation
-- Tracks loading percentages and iteration counts
-- Provides comprehensive summary statistics
+# Initialize PowerFactory
+app = initialize_powerfactory()
 
-## Output Results
+# Run optimization for specific substations
+results = optimize_generators_for_substations(
+    app=app,
+    substations=["substation1", "substation2"],
+    network_data=network_data,
+    hoja="Grid",
+    initial_potencia=1,
+    factor_potencia=0.95,
+    max_cargabilidad=110
+)
+```
 
-The analysis produces a DataFrame with the following columns:
+#### Custom Analysis
 
-| Column | Description |
-|--------|-------------|
-| `Subestacion` | Bus name where generator was placed |
-| `Potencia_Maxima` | Maximum safe power (MW) |
-| `Linea_Critica` | Critical line that limits power |
-| `Cargabilidad_Maxima` | Loading percentage of critical line |
-| `Iteraciones` | Number of iterations required |
+```python
+from src_code.contingency import run_contingency_analysis, process_cargabilidad
+from src_code.plotting import plot_contingency_results
+
+# Run contingency analysis
+df = run_contingency_analysis(app)
+
+# Process results
+line_load_df = process_cargabilidad(df)
+
+# Create visualization
+plot_contingency_results(line_load_df, top_n=20)
+```
+
+## Output Files
+
+The tool generates several output files:
+
+### Results Directory (`output/`)
+- `optimization_results.csv`: Detailed results for each substation
+- `summary_statistics.csv`: Statistical summary of results
+- `optimization_report.txt`: Human-readable report
+
+### Plots Directory (`plots/`)
+- `optimization_dashboard.png`: Comprehensive dashboard with multiple plots
+- Individual plot files for specific analyses
+
+## Key Functions
+
+### Environment Management
+- `pf_enviroment()`: Initialize PowerFactory Python environment
+- `initialize_powerfactory()`: Connect to PowerFactory application
+- `activate_project()`: Activate PowerFactory project
+- `list_and_select_study_case()`: Select study case
+- `list_and_activate_operation_scenario()`: Select operation scenario
+
+### Generator Management
+- `create_static_generator()`: Create static generator at specified bus
+- `update_generator_power()`: Update generator power settings
+- `delete_generator()`: Delete generator and associated equipment
+- `cleanup_all_test_generators()`: Clean up all test generators
+
+### Contingency Analysis
+- `run_contingency_analysis()`: Execute N-1 contingency analysis
+- `process_cargabilidad()`: Process contingency results
+- `optimize_generators_for_substations()`: Main optimization algorithm
+
+### Visualization
+- `plot_contingency_results()`: Plot line loading results
+- `plot_generator_optimization()`: Plot optimization results
+- `create_optimization_dashboard()`: Create comprehensive dashboard
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Generator Creation Fails**:
-   - Ensure PowerFactory project is properly loaded
-   - Check that Grid folder exists and is accessible
-   - Verify bus names are correct
+1. **PowerFactory Connection Failed**
+   - Ensure PowerFactory is running
+   - Check that your project is loaded
+   - Verify PowerFactory license is valid
 
-2. **Contingency Analysis Errors**:
-   - Confirm contingency cases are properly configured
-   - Check that variable selection includes only lines
-   - Verify contingency analysis module is available
+2. **Import Errors**
+   - Check PowerFactory Python path in `main.py`
+   - Ensure all dependencies are installed: `pip install -r requirements.txt`
 
-3. **Line Overloading**:
-   - ✅ **RESOLVED**: Lines have been properly duplicated (Par.no. 2 shows 50-80% loading)
-   - Verify that duplicated lines (Par.no. 2) are being used for generator connections
-   - Check that load flow converges before running contingencies
-   - Note: Lines 09-39A and 09-39B show empty loading - this is normal
+3. **Generator Creation Failed**
+   - Verify bus names exist in the project
+   - Check that the specified sheet/folder exists
+   - Ensure you have write permissions in the project
 
-### Debug Information
+4. **Convergence Issues**
+   - Adjust `THRESHOLD_INCONVERGENCE` parameter
+   - Check network topology and loading conditions
+   - Verify generator parameters are realistic
 
-The code provides extensive debug output including:
-- Folder structure navigation
-- Generator creation attempts
-- Power flow execution status
-- Contingency analysis progress
-- Line loading results
+### Debug Mode
 
-## Technical Details
-
-### PowerFactory Integration
-
-- Uses PowerFactory Python API for automation
-- Implements proper object creation and deletion
-- Handles PowerFactory-specific attribute names
-- Manages study cases and operation scenarios
-
-### Generator Control
-
-- **Voltage Control**: `constv` mode for reactive power management
-- **Power Limits**: Calculated based on power factor constraints
-- **Reactive Limits**: Automatically calculated from apparent power
-
-### Contingency Analysis
-
-- **Method**: AC Load Flow Calculation
-- **Scope**: All transmission line outages
-- **Limits**: 110% maximum line loading
-- **Convergence**: Handles inconvergence detection
+Enable detailed logging by modifying the print statements in the source code or adding logging configuration.
 
 ## Contributing
 
-When modifying this project:
-
-1. **Test with small substation sets** first
-2. **Verify line duplication** is complete
-3. **Check contingency configuration** before running full analysis
-4. **Monitor PowerFactory memory usage** during long runs
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly with PowerFactory
+5. Submit a pull request
 
 ## License
 
-This project is for educational and research purposes. Please ensure compliance with DIgSILENT PowerFactory licensing terms.
+This project is provided as-is for educational and research purposes. Please ensure compliance with DIgSILENT PowerFactory licensing terms.
 
 ## Support
 
 For issues related to:
-- **PowerFactory**: Consult DIgSILENT documentation
-- **Python Code**: Check debug output and error messages
-- **System Setup**: Verify all setup considerations are met
+- **PowerFactory API**: Consult DIgSILENT documentation
+- **Python dependencies**: Check package documentation
+- **This tool**: Create an issue in the repository
+
+## Version History
+
+- **v1.0.0**: Initial release with modular design and comprehensive functionality
 
 ---
 
-**Note**: This project requires significant PowerFactory project modifications before use. Please ensure all setup considerations are properly implemented to avoid analysis failures.
+**Note**: This tool requires a valid PowerFactory license and should be used in accordance with DIgSILENT's terms of service.

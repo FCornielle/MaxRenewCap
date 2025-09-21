@@ -194,8 +194,8 @@ def create_static_generator(app, network_data, hoja_name, barra_name, potencia_a
     static_generator.SetAttribute('usetp', 1)
     
     # Set reactive power limits using correct PowerFactory attributes
-    static_generator.SetAttribute('q_max', potencia_reactiva_max)
-    static_generator.SetAttribute('q_min', potencia_reactiva_min)
+    static_generator.SetAttribute('cQ_max', potencia_reactiva_max)
+    static_generator.SetAttribute('cQ_min', potencia_reactiva_min)
     
     # Set voltage reference for constv mode (should be close to bus voltage)
     static_generator.SetAttribute('usetp', 1)  # Enable the generator
@@ -237,8 +237,8 @@ def update_generator_power(static_generator, potencia_activa, factor_potencia):
     static_generator.SetAttribute('cosn', factor_potencia)
     
     # Set reactive power limits using correct PowerFactory attributes
-    static_generator.SetAttribute('q_max', potencia_reactiva_max)
-    static_generator.SetAttribute('q_min', potencia_reactiva_min)
+    static_generator.SetAttribute('cQ_max', potencia_reactiva_max)
+    static_generator.SetAttribute('cQ_min', potencia_reactiva_min)
     
     # Ensure constv mode is maintained for reactive power control
     static_generator.SetAttribute('av_mode', 'constv')

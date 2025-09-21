@@ -1,16 +1,23 @@
 """
-PowerFactory Contingency Analysis Module
+PowerFactory Generator Optimization Package
 
-This module provides tools for PowerFactory contingency analysis and generator optimization.
-It's organized into several submodules for better maintainability and reusability.
+This package provides tools for optimizing static generators in PowerFactory
+by running N-1 contingency analysis and finding the maximum safe power
+that can be injected at each substation without exceeding loading limits.
 
 Modules:
-- pf_env: PowerFactory environment setup and project management
-- contingency: Contingency analysis and optimization functions
-- generators: Static generator creation and management
-- io_utils: File I/O utilities for CSV and data handling
-- plotting: Visualization functions (optional)
+    - pf_env: PowerFactory environment setup and project management
+    - generators: Static generator creation and management
+    - contingency: Contingency analysis and optimization algorithms
+    - io_utils: Input/output utilities and file management
+    - plotting: Visualization and dashboard creation
+
+Author: PowerFactory Python Scripting
+Version: 1.0
 """
+
+__version__ = "1.0.0"
+__author__ = "PowerFactory Python Scripting"
 
 # Import main functions for easy access
 from .pf_env import (
@@ -21,62 +28,69 @@ from .pf_env import (
     list_and_activate_operation_scenario
 )
 
-from .contingency import (
-    run_contingency_analysis,
-    process_cargabilidad,
-    optimize_generators_for_substations
-)
-
 from .generators import (
     create_static_generator,
-    calculate_power_limits,
-    delete_generator,
     update_generator_power,
+    delete_generator,
+    calculate_power_limits,
     cleanup_existing_generator,
     cleanup_all_test_generators
 )
 
-from .io_utils import (
-    load_contingency_results,
-    save_results_to_csv
+from .contingency import (
+    run_contingency_analysis,
+    process_cargabilidad,
+    optimize_generators_for_substations,
+    show_iteration_details
 )
 
-# Optional plotting functions
-try:
-    from .plotting import (
-        plot_contingency_results,
-        plot_generator_optimization
-    )
-except ImportError:
-    # Plotting functions are optional
-    pass
+from .io_utils import (
+    load_contingency_results,
+    save_results_to_csv,
+    ensure_directory_exists,
+    get_safe_filename,
+    create_results_summary
+)
 
-__version__ = "1.0.0"
-__author__ = "PowerFactory Python Scripting"
+from .plotting import (
+    plot_contingency_results,
+    plot_generator_optimization,
+    plot_power_flow_summary,
+    create_optimization_dashboard
+)
 
-# Make main functions available at package level
 __all__ = [
-    # PowerFactory environment
+    # Environment functions
     'pf_enviroment',
     'initialize_powerfactory',
-    'activate_project', 
+    'activate_project',
     'list_and_select_study_case',
     'list_and_activate_operation_scenario',
     
-    # Contingency analysis
-    'run_contingency_analysis',
-    'process_cargabilidad',
-    'optimize_generators_for_substations',
-    
-    # Generator management
+    # Generator functions
     'create_static_generator',
-    'calculate_power_limits',
-    'delete_generator',
     'update_generator_power',
+    'delete_generator',
+    'calculate_power_limits',
     'cleanup_existing_generator',
     'cleanup_all_test_generators',
     
-    # I/O utilities
+    # Contingency functions
+    'run_contingency_analysis',
+    'process_cargabilidad',
+    'optimize_generators_for_substations',
+    'show_iteration_details',
+    
+    # I/O functions
     'load_contingency_results',
     'save_results_to_csv',
+    'ensure_directory_exists',
+    'get_safe_filename',
+    'create_results_summary',
+    
+    # Plotting functions
+    'plot_contingency_results',
+    'plot_generator_optimization',
+    'plot_power_flow_summary',
+    'create_optimization_dashboard'
 ]
