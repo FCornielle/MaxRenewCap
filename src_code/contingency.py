@@ -39,16 +39,10 @@ def run_contingency_analysis(app):
     contingency_analysis.vlmax = 1.1
     contingency_analysis.vmax_step = 5
     
-    # Debug: Check contingency analysis configuration
-    print(f"Debug: Contingency analysis loadmax: {contingency_analysis.loadmax}")
-    print(f"Debug: Contingency analysis vlmin: {contingency_analysis.vlmin}")
-    print(f"Debug: Contingency analysis vlmax: {contingency_analysis.vlmax}")
-    
     # Try to configure contingency analysis to analyze all lines
     try:
         # Set to analyze all lines
         contingency_analysis.iopt_auto = 1  # Auto-select all elements
-        print("Debug: Set contingency analysis to auto-select all elements")
         
         # Also try to set the analysis to include all lines
         contingency_analysis.iopt_auto = 1
@@ -56,53 +50,31 @@ def run_contingency_analysis(app):
         
         # Try to set the analysis to include all transmission lines
         try:
+            # Set the analysis to include all transmission lines
             contingency_analysis.iopt_auto = 1
-            print("Debug: Auto-select enabled")
         except:
-            print("Debug: Could not enable auto-select")
+            pass
             
         # Try to configure the analysis to include all transmission lines
         try:
             # Set the analysis to include all transmission lines
             contingency_analysis.iopt_auto = 1
-            print("Debug: Configured to analyze all transmission lines")
         except Exception as e:
-            print(f"Debug: Could not configure transmission lines: {e}")
+            pass
             
     except Exception as e:
-        print(f"Debug: Could not set auto-select option: {e}")
+        pass
     
     # Ensure load flow considers reactive power limits
     try:
         power_flow = app.GetFromStudyCase('ComLdf')
         if power_flow is not None:
             power_flow.iopt_lim = 1  # Consider reactive power limits
-            print("Debug: ComLdf iopt_lim set to 1 (consider reactive power limits)")
     except Exception as e:
-        print(f"Debug: Could not set ComLdf iopt_lim: {e}")
+        pass
 
     print("Ejecutando análisis de contingencia...")
     contingency_analysis.Execute()
-    
-    # Debug: Check if contingencies were analyzed
-    print("Debug: Checking contingency analysis results...")
-    print(f"Debug: Contingency analysis completed")
-    
-    # Try to get information about what was analyzed
-    try:
-        # Check if there are any contingencies configured
-        print(f"Debug: Checking contingency analysis configuration...")
-        print(f"Debug: Contingency analysis object: {contingency_analysis}")
-        
-        # Try to get the number of contingencies
-        try:
-            num_contingencies = contingency_analysis.GetNumberOfContingencies()
-            print(f"Debug: Number of contingencies: {num_contingencies}")
-        except:
-            print("Debug: Could not get number of contingencies")
-            
-    except Exception as e:
-        print(f"Debug: Error checking contingency analysis: {e}")
     
     # Export results
     elmres = app.GetFromStudyCase('Contingency Analysis AC.ElmRes')
@@ -121,28 +93,17 @@ def run_contingency_analysis(app):
     comres.pResult = elmres
     comres.f_name = r'Resultados.csv'
     
-    # Debug: Check export configuration
-    print(f"Debug: Export format: {comres.iopt_exp}")
-    print(f"Debug: Export selection: {comres.iopt_csel}")
-    print(f"Debug: Export filename: {comres.f_name}")
-    
     comres.Execute()
     
     print("Cargando resultados del archivo 'Resultados.csv'.")
     
-    # Debug: Check if CSV file exists and has content
+    # Check if CSV file exists and has content
     import os
-    if os.path.exists('Resultados.csv'):
-        file_size = os.path.getsize('Resultados.csv')
-        print(f"Debug: CSV file exists, size: {file_size} bytes")
-    else:
-        print("Debug: CSV file does not exist!")
+    if not os.path.exists('Resultados.csv'):
+        print("Error: CSV file does not exist!")
         return pd.DataFrame()
     
     df = pd.read_csv('Resultados.csv', encoding='latin1', low_memory=False)
-    
-    print(f"Debug: CSV loaded with shape {df.shape}")
-    print(f"Debug: First few rows:\n{df.head(3)}")
     
     return df
 
@@ -262,7 +223,6 @@ def optimize_generators_for_substations(app, substations, network_data, hoja, in
             power_flow = app.GetFromStudyCase('ComLdf')
             if power_flow is not None:
                 power_flow.iopt_lim = 1  # Consider reactive power limits
-                print("Debug: ComLdf iopt_lim set to 1 (consider reactive power limits)")
             power_flow.Execute()
             
             # Get actual power values from the generator after load flow
@@ -281,9 +241,9 @@ def optimize_generators_for_substations(app, substations, network_data, hoja, in
                 # Save result
                 results.append({
                     'Subestacion': substation,
-                    'Potencia Maxima': current_potencia - 1,
-                    'Linea Critica': 'Voltage Limit',
-                    'Cargabilidad Maxima': f'V={actual_bus_voltage:.4f}'
+                    'Potencia_Maxima': current_potencia - 1,
+                    'Linea_Critica': 'Voltage Limit',
+                    'Cargabilidad_Maxima': f'V={actual_bus_voltage:.4f}'
                 })
                 
                 # Delete generator and cubicle
@@ -330,9 +290,9 @@ def optimize_generators_for_substations(app, substations, network_data, hoja, in
                 # Save result
                 results.append({
                     'Subestacion': substation,
-                    'Potencia Maxima': current_potencia - 1,
-                    'Linea Critica': max_line,
-                    'Cargabilidad Maxima': last_max_line_load
+                    'Potencia_Maxima': current_potencia - 1,
+                    'Linea_Critica': max_line,
+                    'Cargabilidad_Maxima': last_max_line_load
                 })
                 
                 # Delete generator and cubicle
