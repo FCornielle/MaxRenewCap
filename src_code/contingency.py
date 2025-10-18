@@ -72,6 +72,15 @@ def run_contingency_analysis(app):
     except Exception as e:
         print(f"Debug: Could not set auto-select option: {e}")
     
+    # Ensure load flow considers reactive power limits
+    try:
+        power_flow = app.GetFromStudyCase('ComLdf')
+        if power_flow is not None:
+            power_flow.iopt_lim = 1  # Consider reactive power limits
+            print("Debug: ComLdf iopt_lim set to 1 (consider reactive power limits)")
+    except Exception as e:
+        print(f"Debug: Could not set ComLdf iopt_lim: {e}")
+
     print("Ejecutando análisis de contingencia...")
     contingency_analysis.Execute()
     
@@ -153,86 +162,21 @@ def process_cargabilidad(df):
     """
     print("Procesando resultados de cargabilidad desde Resultados.csv...")
     
-    # Get the line names row (row 0) and headers row (row 1)
-    line_names_row = df.iloc[0].values
-    headers = df.iloc[1].values
+    # Use the new CSV parser to get the data
+    from .csv_parser import parse_contingency_results
     
-    # Debug: Print first few headers to see what we're working with
-    print(f"Debug: First 10 headers: {headers[:10]}")
-    print(f"Debug: Looking for 'Max. loading in %' in headers...")
+    # Parse the CSV file directly
+    result_df = parse_contingency_results('Resultados.csv')
     
-    # Find columns that contain "Max. loading in %" parameter
-    max_loading_indices = []
-    line_names = []
-    
-    for i, header in enumerate(headers):
-        if header == "Max. loading in %":
-            max_loading_indices.append(i)
-            # Get the actual line name from the same column in row 0
-            line_name = line_names_row[i]
-            if line_name == '   ----' or line_name == '----' or pd.isna(line_name):
-                line_name = f"Line_{i:03d}"
-            line_names.append(line_name)
-    
-    print(f"Encontradas {len(max_loading_indices)} líneas con datos de cargabilidad máxima.")
-    
-    if len(max_loading_indices) == 0:
-        print("⚠️  No se encontraron datos válidos de cargabilidad.")
-        print("Debug: Available headers:", [h for h in headers if 'loading' in str(h).lower() or 'max' in str(h).lower()])
-        print("Debug: All headers:", headers[:20])  # Show first 20 headers
-        return pd.DataFrame(columns=['Linea', 'Cargabilidad_Maxima'])
-    
-    # Extract maximum loading data for each line
-    line_load_data = []
-    
-    for i, (idx, line_name) in enumerate(zip(max_loading_indices, line_names)):
-        # Get all data for this line (skip first 2 rows which are line names and headers)
-        line_data = df.iloc[2:, idx].values
-        
-        # Debug: Print first few data values for this line
-        print(f"Debug: Line {line_name} - First 5 data values: {line_data[:5]}")
-        
-        # Convert to numeric, handling '----' as NaN
-        numeric_data = []
-        for val in line_data:
-            if val == '   ----' or val == '----' or pd.isna(val):
-                numeric_data.append(np.nan)
-            else:
-                try:
-                    numeric_data.append(float(val))
-                except (ValueError, TypeError):
-                    numeric_data.append(np.nan)
-        
-        # Find the maximum loading for this line
-        max_loading = np.nanmax(numeric_data) if not all(np.isnan(numeric_data)) else np.nan
-        
-        if not np.isnan(max_loading):
-            # Clean line name
-            clean_name = line_name.split('\\')[-1] if '\\' in str(line_name) else str(line_name)
-            clean_name = clean_name.replace('.ElmLne', '')
-            
-            # Include all lines (remove voltage filtering for now)
-            line_load_data.append({
-                'Linea': clean_name,
-                'Cargabilidad_Maxima': max_loading
-            })
-            print(f"Debug: Found valid data for {clean_name}: {max_loading}%")
-        else:
-            print(f"Debug: No valid data for {line_name} - all values are NaN or '----'")
-    
-    if not line_load_data:
+    if result_df.empty:
         print("⚠️  No hay datos de cargabilidad válidos")
-        print("Debug: All lines showed '----' values, which means no loading data available")
-        print("Debug: This suggests that either:")
-        print("  1. No contingencies were analyzed")
-        print("  2. The contingencies were analyzed but no lines exceeded the loading threshold")
-        print("  3. The contingency analysis configuration needs adjustment")
         return pd.DataFrame(columns=['Linea', 'Cargabilidad_Maxima'])
     
-    # Create DataFrame and sort by maximum loading
-    line_load_df = pd.DataFrame(line_load_data)
-    line_load_df = line_load_df.sort_values(by='Cargabilidad_Maxima', ascending=False).reset_index(drop=True)
+    # Convert to the expected format
+    line_load_df = result_df[['Linea', 'Max_Loading_Percent']].copy()
+    line_load_df.columns = ['Linea', 'Cargabilidad_Maxima']
     
+    print(f"Encontradas {len(line_load_df)} líneas con datos de cargabilidad máxima.")
     print("Procesamiento de cargabilidad completado.")
     return line_load_df
 
@@ -242,23 +186,30 @@ def show_iteration_details(df, iteration_num, substation, current_potencia):
     print(f"\n📊 DETALLES DE ITERACIÓN {iteration_num} - {substation} ({current_potencia} MW)")
     print("="*60)
     
-    # Process the loading data
-    line_load_df = process_cargabilidad(df)
+    # Use the new CSV parser to get the data
+    from .csv_parser import get_max_loading_summary
     
-    if not line_load_df.empty:
-        print("Top 10 líneas más cargadas:")
-        for i, row in line_load_df.head(10).iterrows():
-            print(f"  {i+1}. {row['Linea']}: {row['Cargabilidad_Maxima']:.2f}%")
-        
-        max_line_load = line_load_df['Cargabilidad_Maxima'].max()
-        max_line = line_load_df[line_load_df['Cargabilidad_Maxima'] == max_line_load]['Linea'].values[0]
-        
-        print(f"\n🎯 RESUMEN: Potencia actual = {current_potencia} MW")
-        print(f"Max cargabilidad = {max_line_load:.2f}%, Línea crítica = {max_line}")
-    else:
+    # Get the summary from the CSV file
+    summary = get_max_loading_summary('Resultados.csv')
+    
+    if summary['all_lines'].empty:
         print("⚠️  No hay datos de cargabilidad válidos")
         print(f"\n🎯 RESUMEN: Potencia actual = {current_potencia} MW")
         print("Max cargabilidad = 0.00%, Línea crítica = N/A")
+        return pd.DataFrame(columns=['Linea', 'Cargabilidad_Maxima'])
+    
+    # Show top 10 most loaded lines
+    print("Top 10 líneas más cargadas:")
+    for i, row in summary['all_lines'].head(10).iterrows():
+        print(f"  {i+1}. {row['Linea']}: {row['Max_Loading_Percent']:.2f}%")
+    
+    # Show summary
+    print(f"\n🎯 RESUMEN: Potencia actual = {current_potencia} MW")
+    print(f"Max cargabilidad = {summary['max_loading']:.2f}%, Línea crítica = {summary['critical_line']}")
+    
+    # Convert to the expected format
+    line_load_df = summary['all_lines'][['Linea', 'Max_Loading_Percent']].copy()
+    line_load_df.columns = ['Linea', 'Cargabilidad_Maxima']
     
     return line_load_df
 
@@ -309,12 +260,15 @@ def optimize_generators_for_substations(app, substations, network_data, hoja, in
             # Run power flow first to get actual power values
             print("Ejecutando flujo de potencia para verificar sistema...")
             power_flow = app.GetFromStudyCase('ComLdf')
+            if power_flow is not None:
+                power_flow.iopt_lim = 1  # Consider reactive power limits
+                print("Debug: ComLdf iopt_lim set to 1 (consider reactive power limits)")
             power_flow.Execute()
             
             # Get actual power values from the generator after load flow
-            actual_p_gen = static_generator.GetAttribute('c:p')
-            actual_q_gen = static_generator.GetAttribute('c:q')
             bus_terminal = static_generator.term
+            actual_p_gen = static_generator.GetAttribute('m:P:bus1')
+            actual_q_gen = static_generator.GetAttribute('m:Q:bus1')
             actual_bus_voltage = bus_terminal.GetAttribute('m:u')
             
             print(f"📊 Estado actual: P = {actual_p_gen:.2f} MW, Q = {actual_q_gen:.2f} MVar, V = {actual_bus_voltage:.4f} pu")

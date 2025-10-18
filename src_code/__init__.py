@@ -43,6 +43,10 @@ from .contingency import (
     optimize_generators_for_substations,
     show_iteration_details
 )
+from .csv_parser import (
+    parse_contingency_results,
+    get_max_loading_summary
+)
 
 from .io_utils import (
     load_contingency_results,
@@ -80,6 +84,10 @@ __all__ = [
     'process_cargabilidad',
     'optimize_generators_for_substations',
     'show_iteration_details',
+    
+    # CSV parsing functions
+    'parse_contingency_results',
+    'get_max_loading_summary',
     
     # I/O functions
     'load_contingency_results',
