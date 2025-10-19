@@ -311,4 +311,13 @@ def optimize_generators_for_substations(app, substations, network_data, hoja, in
     print("Resultados finales:")
     print(df_results)
     
+    # Save results to CSV with timestamp
+    if not df_results.empty:
+        timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"optimization_results_{timestamp}.csv"
+        df_results.to_csv(filename, index=False, encoding='utf-8')
+        print(f"✅ Resultados guardados en: {filename}")
+    else:
+        print("⚠️ No hay resultados para guardar")
+    
     return df_results
