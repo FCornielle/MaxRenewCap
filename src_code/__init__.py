@@ -9,8 +9,6 @@ Modules:
     - pf_env: PowerFactory environment setup and project management
     - generators: Static generator creation and management
     - contingency: Contingency analysis and optimization algorithms
-    - io_utils: Input/output utilities and file management
-    - plotting: Visualization and dashboard creation
 
 Author: PowerFactory Python Scripting
 Version: 1.0
@@ -48,20 +46,7 @@ from .csv_parser import (
     get_max_loading_summary
 )
 
-from .io_utils import (
-    load_contingency_results,
-    save_results_to_csv,
-    ensure_directory_exists,
-    get_safe_filename,
-    create_results_summary
-)
-
-from .plotting import (
-    plot_contingency_results,
-    plot_generator_optimization,
-    plot_power_flow_summary,
-    create_optimization_dashboard
-)
+# plotting.py and io_utils.py were removed from the project as unused
 
 __all__ = [
     # Environment functions
@@ -89,16 +74,4 @@ __all__ = [
     'parse_contingency_results',
     'get_max_loading_summary',
     
-    # I/O functions
-    'load_contingency_results',
-    'save_results_to_csv',
-    'ensure_directory_exists',
-    'get_safe_filename',
-    'create_results_summary',
-    
-    # Plotting functions
-    'plot_contingency_results',
-    'plot_generator_optimization',
-    'plot_power_flow_summary',
-    'create_optimization_dashboard'
 ]
